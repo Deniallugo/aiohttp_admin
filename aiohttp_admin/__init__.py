@@ -12,7 +12,6 @@ from .consts import PROJ_ROOT, TEMPLATE_APP_KEY, APP_KEY, TEMPLATES_ROOT
 from .security import Permissions, require, authorize
 from .utils import gather_template_folders
 
-
 __all__ = ['AdminHandler', 'setup', 'get_admin', 'Permissions', 'require',
            'authorize', '_setup', ]
 __version__ = '0.0.2'
@@ -21,7 +20,6 @@ __version__ = '0.0.2'
 def setup(app, admin_conf_path, *, resources, static_folder=None,
           template_folder=None, template_name=None, name=None,
           app_key=APP_KEY):
-
     admin = web.Application(loop=app.loop)
     app[app_key] = admin
 
@@ -41,7 +39,7 @@ def setup(app, admin_conf_path, *, resources, static_folder=None,
     return admin
 
 
-def _setup(app, *, schema,  title=None, app_key=APP_KEY, db=None):
+def _setup(app, *, schema, title=None, app_key=APP_KEY, db=None):
     """Initialize the admin-on-rest admin"""
 
     admin = web.Application(loop=app.loop)
@@ -53,7 +51,7 @@ def _setup(app, *, schema,  title=None, app_key=APP_KEY, db=None):
         schema.title = title
 
     resources = [
-        init(db, info['table'], url=info['url'])
+        init(info['db'] or db, info['table'], url=info['url'])
         for init, info in schema.resources
     ]
 

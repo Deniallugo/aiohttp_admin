@@ -2,6 +2,7 @@ import json
 
 from collections import namedtuple
 from datetime import datetime, date
+from decimal import Decimal
 from functools import partial
 from types import MappingProxyType
 
@@ -16,10 +17,8 @@ try:
 except ImportError:  # pragma: no cover
     ObjectId = None
 
-
 __all__ = ['json_response', 'jsonify', 'validate_query', 'validate_payload',
            'gather_template_folders']
-
 
 PagingParams = namedtuple('PagingParams',
                           ['limit', 'offset', 'sort_field', 'sort_dir'])
@@ -36,6 +35,9 @@ def json_datetime_serial(obj):
         # TODO: try to use bson.json_util instead
         return str(obj)
 
+    if isinstance(obj, Decimal):
+        return str(obj)
+
     raise TypeError("Type not serializable")
 
 
@@ -43,9 +45,7 @@ jsonify = partial(json.dumps, default=json_datetime_serial)
 
 json_response = partial(web.json_response, dumps=jsonify)
 
-
 OptKey = partial(t.Key, optional=True)
-
 
 SimpleType = t.Int | t.Bool | t.String | t.Float
 Filter = t.Dict({
@@ -59,10 +59,8 @@ Filter = t.Dict({
     OptKey('like'): SimpleType,
 })
 
-
 ASC = 'ASC'
 DESC = 'DESC'
-
 
 ListQuery = t.Dict({
     OptKey('_page', default=1): t.ToInt[1:],

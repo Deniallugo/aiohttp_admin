@@ -1,6 +1,5 @@
 import json
 
-
 __all__ = ['Schema', ]
 
 
@@ -14,7 +13,7 @@ class Schema:
         self.title = title
         self.endpoints = []
 
-    def register(self, Endpoint):
+    def register(self, Endpoint, db=None):
         """
         Register a wrapped `ModelAdmin` class as the endpoint for admin page.
 
@@ -23,8 +22,7 @@ class Schema:
             pass
 
         """
-        self.endpoints.append(Endpoint())
-
+        self.endpoints.append(Endpoint(db))
         return Endpoint
 
     def to_json(self):
@@ -62,7 +60,7 @@ class Schema:
             resource_type = endpoint.Meta.resource_type
             table = endpoint.Meta.table
             url = endpoint.name
-
-            resources.append((resource_type, {'table': table, 'url': url}))
+            db = endpoint.db
+            resources.append((resource_type, {'table': table, 'url': url, 'db': db}))
 
         return resources

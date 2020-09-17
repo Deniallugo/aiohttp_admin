@@ -22,10 +22,11 @@ class ModelAdmin:
     create_form = None
     show_form = None
 
-    def __init__(self):
+    def __init__(self, db=None):
         self.name = self.__class__.__name__.lower()
         self._table = self.Meta.table
         self._resource_type = self.Meta.resource_type
+        self.db = db
 
     def to_dict(self):
         """
