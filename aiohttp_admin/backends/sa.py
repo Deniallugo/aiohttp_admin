@@ -32,16 +32,18 @@ INPUT_TYPES = {
 
 class PGResource(AbstractResource):
 
-    def __init__(self, db, table, primary_key='id', url=None):
-        super().__init__(primary_key=primary_key, resource_name=url)
+    def __init__(self, db, table, primary_key='id', url=None, fields=None):
+
         self._db = db
         self._table = table
-        self._primary_key = primary_key
-        self._pk = table.c[primary_key]
+        self._pk = table.primary_key.columns.values()[0]
+        self._primary_key = self._pk.name
+        super().__init__(primary_key=self._primary_key, resource_name=url)
+        self._fields = fields
         # TODO: do we ability to pass custom validator for table?
-        self._create_validator = table_to_trafaret(table, primary_key,
+        self._create_validator = table_to_trafaret(table, self._primary_key,
                                                    skip_pk=True)
-        self._update_validator = table_to_trafaret(table, primary_key,
+        self._update_validator = table_to_trafaret(table, self._primary_key,
                                                    skip_pk=True)
 
     @property
@@ -66,9 +68,13 @@ class PGResource(AbstractResource):
         if not fields:
             fields = table.primary_key
 
-        actual_fields = [
-            field for field in table.c.items() if field[0] in fields
-        ]
+        if fields == '*':
+            actual_fields = table.c.items()
+
+        else:
+            actual_fields = [
+                field for field in table.c.items() if field[0] in fields
+            ]
 
         data_type_fields = {
             name: FIELD_TYPES.get(type(field_type.type), rc.TEXT_FIELD.value)
@@ -198,6 +204,7 @@ class AsyncpgResource(PGResource):
     async def list(self, request):
         await require(request, Permissions.view)
         columns_names = list(self._table.c.keys())
+
         q = validate_query(request.query, columns_names)
         paging = calc_pagination(q, self._primary_key)
 
@@ -218,8 +225,7 @@ class AsyncpgResource(PGResource):
                     .limit(paging.limit)
                     .order_by(sort_dir(paging.sort_field))
             )
-
-            entities = list(map(dict, recs))
+            entities = [{'id': rec[self.primary_key], **rec} for rec in recs]
 
         headers = {'X-Total-Count': str(count)}
         return json_response(entities, headers=headers)

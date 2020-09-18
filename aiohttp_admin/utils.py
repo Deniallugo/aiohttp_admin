@@ -139,6 +139,7 @@ def validate_query(query, possible_columns):
 
     not_valid = set(columns).difference(
         possible_columns + [MULTI_FIELD_TEXT_QUERY])
+
     if not_valid:
         column_list = ', '.join(not_valid)
         msg = 'Columns: {} do not present in resource'.format(column_list)

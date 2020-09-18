@@ -21,6 +21,7 @@ class ModelAdmin:
     edit_form = None
     create_form = None
     show_form = None
+    primary_key = 'id'
 
     def __init__(self, db=None):
         self.name = self.__class__.__name__.lower()
@@ -41,6 +42,7 @@ class ModelAdmin:
             "showPage": self.generate_data_for_show_page(),
             "editPage": self.generate_data_for_edit_page(),
             "createPage": self.generate_data_for_create_page(),
+            "primaryKey": self.primary_key
         }
 
         return data
