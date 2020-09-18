@@ -1,6 +1,9 @@
+import logging
+
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
+from .grpc import GrpcClient, GrpcError
 from ..resource import AbstractResource
 from ..exceptions import ObjectNotFound
 from ..security import require, Permissions
@@ -9,7 +12,7 @@ from ..utils import (json_response, validate_payload, validate_query,
 from .sa_utils import table_to_trafaret, create_filter
 from ..contrib.constants import ReactComponent as rc
 
-__all__ = ['PGResource', 'MySQLResource']
+__all__ = ['PGResource', 'MySQLResource', 'AsyncpgGrpcResource', 'AsyncpgResource']
 
 FIELD_TYPES = {
     sa.Integer: rc.TEXT_FIELD.value,
@@ -200,6 +203,7 @@ class PGResource(AbstractResource):
         return json_response({'status': 'deleted'})
 
 
+
 class AsyncpgResource(PGResource):
     async def list(self, request):
         await require(request, Permissions.view)
@@ -348,3 +352,47 @@ class MySQLResource(PGResource):
 
         entity = dict(rec)
         return json_response(entity)
+
+
+class AsyncpgGrpcResource(AsyncpgResource):
+    def __init__(self, *args, client: GrpcClient, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.client = client
+
+    async def update(self, request):
+        await require(request, Permissions.edit)
+        entity_id = request.match_info['entity_id']
+        raw_payload = await request.read()
+        data = validate_payload(raw_payload, self._update_validator)
+        try:
+            await self.client.update(entity_id, **data)
+        except GrpcError as e:
+            return json_response({"status": {"error": str(e)}})
+        async with self.pool.acquire() as conn:
+            query = self.table.select().where(self._pk == entity_id)
+            rec = await conn.fetchrow(query)
+        entity = dict(rec)
+        return json_response(entity)
+
+    async def create(self, request):
+        await require(request, Permissions.add)
+        raw_payload = await request.read()
+        data = validate_payload(raw_payload, self._create_validator)
+        try:
+            entity_id = await self.client.create(**data)
+        except GrpcError as e:
+            return json_response({"status": {"error": str(e)}})
+        async with self.pool.acquire() as conn:
+            query = self.table.select().where(self._pk == entity_id)
+            rec = await conn.fetchrow(query)
+        entity = dict(rec)
+        return json_response(entity)
+
+    async def delete(self, request):
+        await require(request, Permissions.delete)
+        entity_id = request.match_info['entity_id']
+        try:
+            await self.client.delete(entity_id=entity_id)
+        except GrpcError as e:
+            return json_response({"status": {"error": str(e)}})
+        return json_response({'status': 'deleted'})

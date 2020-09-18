@@ -97,3 +97,10 @@ class ModelAdmin:
             return self.create_form.to_dict()
 
         return self.generate_simple_data_page()
+
+    def get_info_for_resource(self):
+        return dict(
+            table=self.Meta.table,
+            url=self.name,
+            db=self.db
+        )

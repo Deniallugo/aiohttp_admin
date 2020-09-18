@@ -50,10 +50,7 @@ def _setup(app, *, schema, title=None, app_key=APP_KEY, db=None):
     if title:
         schema.title = title
 
-    resources = [
-        init(info['db'] or db, info['table'], url=info['url'])
-        for init, info in schema.resources
-    ]
+    resources = [init(**{'db': db, **info}) for init, info in schema.resources]
 
     admin_handler = AdminOnRestHandler(
         admin,
