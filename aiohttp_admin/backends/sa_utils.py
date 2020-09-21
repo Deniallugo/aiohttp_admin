@@ -46,7 +46,7 @@ def build_trafaret(sa_type, **kwargs):
         trafaret = AnyDict | t.List(AnyDict)
 
     # Add PG related JSON and ARRAY
-    elif isinstance(sa_type, postgresql.ARRAY):
+    elif isinstance(sa_type, (postgresql.ARRAY, sa.ARRAY)):
         item_trafaret = build_trafaret(sa_type.item_type)
         trafaret = t.List(item_trafaret)
     elif isinstance(sa_type, sa.DECIMAL):
