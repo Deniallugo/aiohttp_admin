@@ -365,6 +365,11 @@ class AsyncpgGrpcResource(AsyncpgResource):
         raw_payload = await request.read()
         data = validate_payload(raw_payload, self._update_validator)
         try:
+            entity_id = int(entity_id)
+        except ValueError:
+            pass
+
+        try:
             await self.client.update(entity_id, **data)
         except GrpcError as e:
             return json_response({"status": {"error": str(e)}})

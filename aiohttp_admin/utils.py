@@ -107,7 +107,8 @@ def validate_payload(raw_payload, schema):
         parsed = json.loads(payload)
     except ValueError:
         raise JsonValidaitonError('Payload is not json serialisable')
-
+    for key, value in parsed.items():
+        parsed[key] = value or None
     try:
         data = schema(parsed)
     except t.DataError as exc:
