@@ -110,7 +110,7 @@ def validate_payload(raw_payload, schema):
     for key, value in parsed.items():
         try:
             value = json.loads(value)
-        except ValueError:
+        except:
             pass
         parsed[key] = value or None
     try:
