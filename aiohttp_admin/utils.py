@@ -1,16 +1,15 @@
-import json
-
 from collections import namedtuple
-from datetime import datetime, date
+from datetime import date, datetime
 from decimal import Decimal
 from functools import partial
+import json
 from types import MappingProxyType
 
-import trafaret as t
 from aiohttp import web
+import trafaret as t
 
-from .exceptions import JsonValidaitonError
 from .consts import TEMPLATES_ROOT
+from .exceptions import JsonValidaitonError
 
 try:
     from bson import ObjectId
@@ -49,13 +48,13 @@ OptKey = partial(t.Key, optional=True)
 
 SimpleType = t.Int | t.Bool | t.String | t.Float
 Filter = t.Dict({
-    OptKey('in'): t.List(SimpleType),
-    OptKey('gt'): SimpleType,
-    OptKey('ge'): SimpleType,
-    OptKey('lt'): SimpleType,
-    OptKey('le'): SimpleType,
-    OptKey('ne'): SimpleType,
-    OptKey('eq'): SimpleType,
+    OptKey('in'):   t.List(SimpleType),
+    OptKey('gt'):   SimpleType,
+    OptKey('ge'):   SimpleType,
+    OptKey('lt'):   SimpleType,
+    OptKey('le'):   SimpleType,
+    OptKey('ne'):   SimpleType,
+    OptKey('eq'):   SimpleType,
     OptKey('like'): SimpleType,
 })
 
@@ -63,12 +62,12 @@ ASC = 'ASC'
 DESC = 'DESC'
 
 ListQuery = t.Dict({
-    OptKey('_page', default=1): t.ToInt[1:],
-    OptKey('_perPage', default=30): t.ToInt[1:],
-    OptKey('_sortField'): t.String,
+    OptKey('_page', default=1):       t.ToInt[1:],
+    OptKey('_perPage', default=30):   t.ToInt[1:],
+    OptKey('_sortField'):             t.String,
     OptKey('_sortDir', default=DESC): t.Enum(DESC, ASC),
 
-    OptKey('_filters'): t.Mapping(t.String, Filter | SimpleType)
+    OptKey('_filters'):               t.Mapping(t.String, Filter | SimpleType)
 })
 
 LoginForm = t.Dict({
@@ -109,7 +108,9 @@ def validate_payload(raw_payload, schema):
         raise JsonValidaitonError('Payload is not json serialisable')
     for key, value in parsed.items():
         try:
-            value = json.loads(value)
+            new_value = json.loads(value)
+            if isinstance(new_value, (list, dict)):
+                value = new_value
         except:
             pass
         parsed[key] = value or None
