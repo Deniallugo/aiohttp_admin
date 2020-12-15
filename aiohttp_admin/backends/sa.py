@@ -7,12 +7,17 @@ from .grpc import GrpcClient, GrpcError
 from ..resource import AbstractResource
 from ..exceptions import ObjectNotFound
 from ..security import require, Permissions
-from ..utils import (json_response, validate_payload, validate_query,
-                     calc_pagination, ASC)
+from ..utils import (
+    json_response,
+    validate_payload,
+    validate_query,
+    calc_pagination,
+    ASC,
+)
 from .sa_utils import table_to_trafaret, create_filter
 from ..contrib.constants import ReactComponent as rc
 
-__all__ = ['PGResource', 'MySQLResource', 'AsyncpgGrpcResource', 'AsyncpgResource']
+__all__ = ["PGResource", "MySQLResource", "AsyncpgGrpcResource", "AsyncpgResource"]
 
 FIELD_TYPES = {
     sa.Integer: rc.TEXT_FIELD.value,
@@ -34,8 +39,7 @@ INPUT_TYPES = {
 
 
 class PGResource(AbstractResource):
-
-    def __init__(self, db, table, primary_key='id', url=None, fields=None):
+    def __init__(self, db, table, primary_key="id", url=None, fields=None, skip_pk=True):
 
         self._db = db
         self._table = table
@@ -44,10 +48,12 @@ class PGResource(AbstractResource):
         super().__init__(primary_key=self._primary_key, resource_name=url)
         self._fields = fields
         # TODO: do we ability to pass custom validator for table?
-        self._create_validator = table_to_trafaret(table, self._primary_key,
-                                                   skip_pk=True)
-        self._update_validator = table_to_trafaret(table, self._primary_key,
-                                                   skip_pk=True)
+        self._create_validator = table_to_trafaret(
+            table, self._primary_key, skip_pk=skip_pk
+        )
+        self._update_validator = table_to_trafaret(
+            table, self._primary_key, skip_pk=skip_pk
+        )
 
     @property
     def pool(self):
@@ -71,13 +77,11 @@ class PGResource(AbstractResource):
         if not fields:
             fields = table.primary_key
 
-        if fields == '*':
+        if fields == "*":
             actual_fields = table.c.items()
 
         else:
-            actual_fields = [
-                field for field in table.c.items() if field[0] in fields
-            ]
+            actual_fields = [field for field in table.c.items() if field[0] in fields]
 
         data_type_fields = {
             name: FIELD_TYPES.get(type(field_type.type), rc.TEXT_FIELD.value)
@@ -96,13 +100,12 @@ class PGResource(AbstractResource):
         """
         return [
             dict(
-                type=INPUT_TYPES.get(
-                    type(field_type.type), rc.TEXT_INPUT.value
-                ),
+                type=INPUT_TYPES.get(type(field_type.type), rc.TEXT_INPUT.value),
                 name=name,
                 isPrimaryKey=(name in table.primary_key),
                 props=None,
-            ) for name, field_type in table.c.items()
+            )
+            for name, field_type in table.c.items()
         ]
 
     async def list(self, request):
@@ -111,40 +114,40 @@ class PGResource(AbstractResource):
         q = validate_query(request.query, columns_names)
         paging = calc_pagination(q, self._primary_key)
 
-        filters = q.get('_filters')
+        filters = q.get("_filters")
         async with self.pool.acquire() as conn:
             if filters:
                 query = create_filter(self.table, filters)
             else:
                 query = self.table.select()
             count = await conn.scalar(
-                sa.select([sa.func.count()])
-                    .select_from(query.alias('foo')))
+                sa.select([sa.func.count()]).select_from(query.alias("foo"))
+            )
 
             sort_dir = sa.asc if paging.sort_dir == ASC else sa.desc
             cursor = await conn.execute(
-                query
-                    .offset(paging.offset)
-                    .limit(paging.limit)
-                    .order_by(sort_dir(paging.sort_field)))
+                query.offset(paging.offset)
+                .limit(paging.limit)
+                .order_by(sort_dir(paging.sort_field))
+            )
 
             recs = await cursor.fetchall()
 
             entities = list(map(dict, recs))
 
-        headers = {'X-Total-Count': str(count)}
+        headers = {"X-Total-Count": str(count)}
         return json_response(entities, headers=headers)
 
     async def detail(self, request):
         await require(request, Permissions.view)
-        entity_id = request.match_info['entity_id']
+        entity_id = request.match_info["entity_id"]
         async with self.pool.acquire() as conn:
             query = self.table.select().where(self._pk == entity_id)
             resp = await conn.execute(query)
             rec = await resp.first()
 
         if not rec:
-            msg = 'Entity with id: {} not found'.format(entity_id)
+            msg = "Entity with id: {} not found".format(entity_id)
             raise ObjectNotFound(msg)
 
         entity = dict(rec)
@@ -159,14 +162,14 @@ class PGResource(AbstractResource):
             query = self.table.insert().values(data).returning(*self.table.c)
             rec = await conn.execute(query)
             row = await rec.first()
-            await conn.execute('commit;')
+            await conn.execute("commit;")
 
         entity = dict(row)
         return json_response(entity)
 
     async def update(self, request):
         await require(request, Permissions.edit)
-        entity_id = request.match_info['entity_id']
+        entity_id = request.match_info["entity_id"]
         raw_payload = await request.read()
         data = validate_payload(raw_payload, self._update_validator)
 
@@ -176,32 +179,32 @@ class PGResource(AbstractResource):
             row = await conn.execute(query)
             rec = await row.first()
             if not rec:
-                msg = 'Entity with id: {} not found'.format(entity_id)
+                msg = "Entity with id: {} not found".format(entity_id)
                 raise ObjectNotFound(msg)
 
             row = await conn.execute(
                 self.table.update()
-                    .values(data)
-                    .returning(*self.table.c)
-                    .where(self._pk == entity_id))
+                .values(data)
+                .returning(*self.table.c)
+                .where(self._pk == entity_id)
+            )
             rec = await row.first()
-            await conn.execute('commit;')
+            await conn.execute("commit;")
 
         entity = dict(rec)
         return json_response(entity)
 
     async def delete(self, request):
         await require(request, Permissions.delete)
-        entity_id = request.match_info['entity_id']
+        entity_id = request.match_info["entity_id"]
 
         async with self.pool.acquire() as conn:
             query = self.table.delete().where(self._pk == entity_id)
             await conn.execute(query)
             # TODO: Think about autocommit by default
-            await conn.execute('commit;')
+            await conn.execute("commit;")
 
-        return json_response({'status': 'deleted'})
-
+        return json_response({"status": "deleted"})
 
 
 class AsyncpgResource(PGResource):
@@ -212,31 +215,30 @@ class AsyncpgResource(PGResource):
         q = validate_query(request.query, columns_names)
         paging = calc_pagination(q, self._primary_key)
 
-        filters = q.get('_filters')
+        filters = q.get("_filters")
         async with self.pool.acquire() as conn:
             if filters:
                 query = create_filter(self.table, filters)
             else:
                 query = self.table.select()
             count = await conn.fetchval(
-                sa.select([sa.func.count()])
-                    .select_from(query.alias('foo')))
+                sa.select([sa.func.count()]).select_from(query.alias("foo"))
+            )
 
             sort_dir = sa.asc if paging.sort_dir == ASC else sa.desc
             recs = await conn.fetch(
-                query
-                    .offset(paging.offset)
-                    .limit(paging.limit)
-                    .order_by(sort_dir(paging.sort_field))
+                query.offset(paging.offset)
+                .limit(paging.limit)
+                .order_by(sort_dir(paging.sort_field))
             )
-            entities = [{'id': rec[self.primary_key], **rec} for rec in recs]
+            entities = [{"id": rec[self.primary_key], **rec} for rec in recs]
 
-        headers = {'X-Total-Count': str(count)}
+        headers = {"X-Total-Count": str(count)}
         return json_response(entities, headers=headers)
 
     async def detail(self, request):
         await require(request, Permissions.view)
-        entity_id = request.match_info['entity_id']
+        entity_id = request.match_info["entity_id"]
         try:
             entity_id = int(entity_id)
         except ValueError:
@@ -265,7 +267,7 @@ class AsyncpgResource(PGResource):
 
     async def update(self, request):
         await require(request, Permissions.edit)
-        entity_id = request.match_info['entity_id']
+        entity_id = request.match_info["entity_id"]
         raw_payload = await request.read()
         data = validate_payload(raw_payload, self._update_validator)
         try:
@@ -282,16 +284,17 @@ class AsyncpgResource(PGResource):
 
             row = await conn.fetchrow(
                 self.table.update()
-                    .values(data)
-                    .returning(*self.table.c)
-                    .where(self._pk == entity_id))
+                .values(data)
+                .returning(*self.table.c)
+                .where(self._pk == entity_id)
+            )
 
         entity = dict(row)
         return json_response(entity)
 
     async def delete(self, request):
         await require(request, Permissions.delete)
-        entity_id = request.match_info['entity_id']
+        entity_id = request.match_info["entity_id"]
         try:
             entity_id = int(entity_id)
         except ValueError:
@@ -300,11 +303,10 @@ class AsyncpgResource(PGResource):
             query = self.table.delete().where(self._pk == entity_id)
             await conn.execute(query)
 
-        return json_response({'status': 'deleted'})
+        return json_response({"status": "deleted"})
 
 
 class MySQLResource(PGResource):
-
     async def create(self, request):
         await require(request, Permissions.add)
         raw_payload = await request.read()
@@ -314,40 +316,34 @@ class MySQLResource(PGResource):
             rec = await conn.execute(self.table.insert().values(data))
             new_entity_id = rec.lastrowid
             resp = await conn.execute(
-                self.table.select()
-                    .where(self._pk == new_entity_id))
+                self.table.select().where(self._pk == new_entity_id)
+            )
             rec = await resp.first()
-            await conn.execute('commit;')
+            await conn.execute("commit;")
 
         entity = dict(rec)
         return json_response(entity)
 
     async def update(self, request):
         await require(request, Permissions.edit)
-        entity_id = request.match_info['entity_id']
+        entity_id = request.match_info["entity_id"]
         raw_payload = await request.read()
         data = validate_payload(raw_payload, self._update_validator)
 
         # TODO: execute in transaction?
         async with self.pool.acquire() as conn:
-            row = await conn.execute(
-                self.table.select()
-                    .where(self._pk == entity_id)
-            )
+            row = await conn.execute(self.table.select().where(self._pk == entity_id))
             rec = await row.first()
             if not rec:
-                msg = 'Entity with id: {} not found'.format(entity_id)
+                msg = "Entity with id: {} not found".format(entity_id)
                 raise ObjectNotFound(msg)
 
             await conn.execute(
-                self.table.update()
-                    .values(data)
-                    .where(self._pk == entity_id))
+                self.table.update().values(data).where(self._pk == entity_id)
+            )
 
-            await conn.execute('commit;')
-            resp = await conn.execute(
-                self.table.select()
-                    .where(self._pk == entity_id))
+            await conn.execute("commit;")
+            resp = await conn.execute(self.table.select().where(self._pk == entity_id))
             rec = await resp.first()
 
         entity = dict(rec)
@@ -361,7 +357,7 @@ class AsyncpgGrpcResource(AsyncpgResource):
 
     async def update(self, request):
         await require(request, Permissions.edit)
-        entity_id = request.match_info['entity_id']
+        entity_id = request.match_info["entity_id"]
         raw_payload = await request.read()
         data = validate_payload(raw_payload, self._update_validator)
         try:
@@ -395,9 +391,9 @@ class AsyncpgGrpcResource(AsyncpgResource):
 
     async def delete(self, request):
         await require(request, Permissions.delete)
-        entity_id = request.match_info['entity_id']
+        entity_id = request.match_info["entity_id"]
         try:
             await self.client.delete(entity_id=entity_id)
         except GrpcError as e:
             return json_response({"status": {"error": str(e)}})
-        return json_response({'status': 'deleted'})
+        return json_response({"status": "deleted"})
