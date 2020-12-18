@@ -21,11 +21,13 @@ class ModelAdmin:
     edit_form = None
     create_form = None
     show_form = None
+    primary_key = 'id'
 
-    def __init__(self):
+    def __init__(self, db=None):
         self.name = self.__class__.__name__.lower()
         self._table = self.Meta.table
         self._resource_type = self.Meta.resource_type
+        self.db = db
 
     def to_dict(self):
         """
@@ -40,6 +42,7 @@ class ModelAdmin:
             "showPage": self.generate_data_for_show_page(),
             "editPage": self.generate_data_for_edit_page(),
             "createPage": self.generate_data_for_create_page(),
+            "primaryKey": self.primary_key
         }
 
         return data
@@ -94,3 +97,10 @@ class ModelAdmin:
             return self.create_form.to_dict()
 
         return self.generate_simple_data_page()
+
+    def get_info_for_resource(self):
+        return dict(
+            table=self.Meta.table,
+            url=self.name,
+            db=self.db
+        )

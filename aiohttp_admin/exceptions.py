@@ -28,6 +28,10 @@ class ObjectNotFound(AdminRESTError):
     status_code = 404
     error = "Object not found"
 
+    def __init__(self, entity_id, status_code=None, **kwargs):
+        message = f'Entity with id: {entity_id} not found'
+        super(ObjectNotFound, self).__init__(message, status_code, **kwargs)
+
 
 class JsonValidaitonError(AdminRESTError):
     status_code = 400

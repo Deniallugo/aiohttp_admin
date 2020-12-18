@@ -1,25 +1,23 @@
-import json
-
 from collections import namedtuple
-from datetime import datetime, date
+from datetime import date, datetime
+from decimal import Decimal
 from functools import partial
+import json
 from types import MappingProxyType
 
-import trafaret as t
 from aiohttp import web
+import trafaret as t
 
-from .exceptions import JsonValidaitonError
 from .consts import TEMPLATES_ROOT
+from .exceptions import JsonValidaitonError
 
 try:
     from bson import ObjectId
 except ImportError:  # pragma: no cover
     ObjectId = None
 
-
 __all__ = ['json_response', 'jsonify', 'validate_query', 'validate_payload',
            'gather_template_folders']
-
 
 PagingParams = namedtuple('PagingParams',
                           ['limit', 'offset', 'sort_field', 'sort_dir'])
@@ -36,6 +34,9 @@ def json_datetime_serial(obj):
         # TODO: try to use bson.json_util instead
         return str(obj)
 
+    if isinstance(obj, Decimal):
+        return str(obj)
+
     raise TypeError("Type not serializable")
 
 
@@ -43,34 +44,30 @@ jsonify = partial(json.dumps, default=json_datetime_serial)
 
 json_response = partial(web.json_response, dumps=jsonify)
 
-
 OptKey = partial(t.Key, optional=True)
-
 
 SimpleType = t.Int | t.Bool | t.String | t.Float
 Filter = t.Dict({
-    OptKey('in'): t.List(SimpleType),
-    OptKey('gt'): SimpleType,
-    OptKey('ge'): SimpleType,
-    OptKey('lt'): SimpleType,
-    OptKey('le'): SimpleType,
-    OptKey('ne'): SimpleType,
-    OptKey('eq'): SimpleType,
+    OptKey('in'):   t.List(SimpleType),
+    OptKey('gt'):   SimpleType,
+    OptKey('ge'):   SimpleType,
+    OptKey('lt'):   SimpleType,
+    OptKey('le'):   SimpleType,
+    OptKey('ne'):   SimpleType,
+    OptKey('eq'):   SimpleType,
     OptKey('like'): SimpleType,
 })
-
 
 ASC = 'ASC'
 DESC = 'DESC'
 
-
 ListQuery = t.Dict({
-    OptKey('_page', default=1): t.ToInt[1:],
-    OptKey('_perPage', default=30): t.ToInt[1:],
-    OptKey('_sortField'): t.String,
+    OptKey('_page', default=1):       t.ToInt[1:],
+    OptKey('_perPage', default=30):   t.ToInt[1:],
+    OptKey('_sortField'):             t.String,
     OptKey('_sortDir', default=DESC): t.Enum(DESC, ASC),
 
-    OptKey('_filters'): t.Mapping(t.String, Filter | SimpleType)
+    OptKey('_filters'):               t.Mapping(t.String, Filter | SimpleType)
 })
 
 LoginForm = t.Dict({
@@ -109,7 +106,14 @@ def validate_payload(raw_payload, schema):
         parsed = json.loads(payload)
     except ValueError:
         raise JsonValidaitonError('Payload is not json serialisable')
-
+    for key, value in parsed.items():
+        try:
+            new_value = json.loads(value)
+            if isinstance(new_value, (list, dict)):
+                value = new_value
+        except:
+            pass
+        parsed[key] = value or None
     try:
         data = schema(parsed)
     except t.DataError as exc:
@@ -141,6 +145,7 @@ def validate_query(query, possible_columns):
 
     not_valid = set(columns).difference(
         possible_columns + [MULTI_FIELD_TEXT_QUERY])
+
     if not_valid:
         column_list = ', '.join(not_valid)
         msg = 'Columns: {} do not present in resource'.format(column_list)

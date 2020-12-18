@@ -1,4 +1,5 @@
 import operator as _operator
+from decimal import Decimal
 
 import sqlalchemy as sa
 import trafaret as t
@@ -9,15 +10,12 @@ from trafaret.contrib.rfc_3339 import DateTime
 from ..exceptions import JsonValidaitonError
 from ..utils import MULTI_FIELD_TEXT_QUERY, as_dict
 
-
 __all__ = ['table_to_trafaret', 'create_filter']
-
 
 AnyDict = t.Dict({}).allow_extra('*')
 
 
 def build_trafaret(sa_type, **kwargs):
-
     if isinstance(sa_type, sa.sql.sqltypes.Enum):
         trafaret = t.Enum(*sa_type.enums, **kwargs)
 
@@ -48,9 +46,11 @@ def build_trafaret(sa_type, **kwargs):
         trafaret = AnyDict | t.List(AnyDict)
 
     # Add PG related JSON and ARRAY
-    elif isinstance(sa_type, postgresql.ARRAY):
+    elif isinstance(sa_type, (postgresql.ARRAY, sa.ARRAY)):
         item_trafaret = build_trafaret(sa_type.item_type)
         trafaret = t.List(item_trafaret)
+    elif isinstance(sa_type, sa.DECIMAL):
+        trafaret = t.ToDecimal(**kwargs)
 
     else:
         type_ = str(sa_type)

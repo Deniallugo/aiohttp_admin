@@ -56,7 +56,7 @@ function generateResourcesByState(state) {
           key={index}
           name={data.name}
           icon={Icon}
-          sort={{ field: 'id', order: 'DESC' }}
+          sort={{ field: data.primaryKey, order: 'DESC' }}
           {...getAccessMethods(data)}
         />
       ))
