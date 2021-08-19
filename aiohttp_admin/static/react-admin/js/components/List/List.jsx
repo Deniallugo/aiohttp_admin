@@ -9,11 +9,11 @@ import { EditButton } from '../Button/EditButton';
 import { ShowButton } from '../Button/ShowButton';
 import { getFields } from '../../utils/listFields';
 
-
 export const BaseList = props => (
   <List {...props}
     title={`List of ${props.resource}`}
-    perPage={props.data.perPage}
+    sort={{field: props.data.primaryKey}}
+        perPage={props.data.perPage}
   >
     <Datagrid>
         {getFields(props.data.fields)}
